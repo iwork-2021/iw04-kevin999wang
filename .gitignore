@@ -1,0 +1,5 @@
+/data
+.ipynb_checkpoints
+.DS_Store
+cifar_net.pth
+my_net.mlmodel
