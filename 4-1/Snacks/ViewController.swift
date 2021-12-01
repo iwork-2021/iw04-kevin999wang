@@ -27,85 +27,131 @@
 /// THE SOFTWARE.
 
 import UIKit
+import CoreML
+import CoreMedia
+import Vision
 
 class ViewController: UIViewController {
-  
-  @IBOutlet var imageView: UIImageView!
-  @IBOutlet var cameraButton: UIButton!
-  @IBOutlet var photoLibraryButton: UIButton!
-  @IBOutlet var resultsView: UIView!
-  @IBOutlet var resultsLabel: UILabel!
-  @IBOutlet var resultsConstraint: NSLayoutConstraint!
-
-  var firstTime = true
-
-  override func viewDidLoad() {
-    super.viewDidLoad()
-    cameraButton.isEnabled = UIImagePickerController.isSourceTypeAvailable(.camera)
-    resultsView.alpha = 0
-    resultsLabel.text = "choose or take a photo"
-  }
-
-  override func viewDidAppear(_ animated: Bool) {
-    super.viewDidAppear(animated)
-
-    // Show the "choose or take a photo" hint when the app is opened.
-    if firstTime {
-      showResultsView(delay: 0.5)
-      firstTime = false
+    
+    @IBOutlet var imageView: UIImageView!
+    @IBOutlet var cameraButton: UIButton!
+    @IBOutlet var photoLibraryButton: UIButton!
+    @IBOutlet var resultsView: UIView!
+    @IBOutlet var resultsLabel: UILabel!
+    @IBOutlet var resultsConstraint: NSLayoutConstraint!
+    
+    var firstTime = true
+    
+    
+    lazy var classificationRequest: VNCoreMLRequest = {
+        do {
+            let classifier = try KindsOfSnacksClassifier(configuration: MLModelConfiguration())
+            let model = try VNCoreMLModel(for: classifier.model)
+            let request = VNCoreMLRequest(model: model, completionHandler: {
+                [weak self] request,error in
+                self?.processObservations(for: request, error: error)
+            })
+            request.imageCropAndScaleOption = .centerCrop
+            return request
+        } catch {
+            fatalError("Failed to create request")
+        }
+    }()
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        cameraButton.isEnabled = UIImagePickerController.isSourceTypeAvailable(.camera)
+        resultsView.alpha = 0
+        resultsLabel.text = "choose or take a photo"
     }
-  }
-  
-  @IBAction func takePicture() {
-    presentPhotoPicker(sourceType: .camera)
-  }
-
-  @IBAction func choosePhoto() {
-    presentPhotoPicker(sourceType: .photoLibrary)
-  }
-
-  func presentPhotoPicker(sourceType: UIImagePickerController.SourceType) {
-    let picker = UIImagePickerController()
-    picker.delegate = self
-    picker.sourceType = sourceType
-    present(picker, animated: true)
-    hideResultsView()
-  }
-
-  func showResultsView(delay: TimeInterval = 0.1) {
-    resultsConstraint.constant = 100
-    view.layoutIfNeeded()
-
-    UIView.animate(withDuration: 0.5,
-                   delay: delay,
-                   usingSpringWithDamping: 0.6,
-                   initialSpringVelocity: 0.6,
-                   options: .beginFromCurrentState,
-                   animations: {
-      self.resultsView.alpha = 1
-      self.resultsConstraint.constant = -10
-      self.view.layoutIfNeeded()
-    },
-    completion: nil)
-  }
-
-  func hideResultsView() {
-    UIView.animate(withDuration: 0.3) {
-      self.resultsView.alpha = 0
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        // Show the "choose or take a photo" hint when the app is opened.
+        if firstTime {
+            showResultsView(delay: 0.5)
+            firstTime = false
+        }
     }
-  }
-
-  func classify(image: UIImage) {
-  }
+    
+    @IBAction func takePicture() {
+        presentPhotoPicker(sourceType: .camera)
+    }
+    
+    @IBAction func choosePhoto() {
+        presentPhotoPicker(sourceType: .photoLibrary)
+    }
+    
+    func presentPhotoPicker(sourceType: UIImagePickerController.SourceType) {
+        let picker = UIImagePickerController()
+        picker.delegate = self
+        picker.sourceType = sourceType
+        present(picker, animated: true)
+        hideResultsView()
+    }
+    
+    func showResultsView(delay: TimeInterval = 0.1) {
+        resultsConstraint.constant = 100
+        view.layoutIfNeeded()
+        
+        UIView.animate(withDuration: 0.5,
+                       delay: delay,
+                       usingSpringWithDamping: 0.6,
+                       initialSpringVelocity: 0.6,
+                       options: .beginFromCurrentState,
+                       animations: {
+            self.resultsView.alpha = 1
+            self.resultsConstraint.constant = -10
+            self.view.layoutIfNeeded()
+        },
+                       completion: nil)
+    }
+    
+    func hideResultsView() {
+        UIView.animate(withDuration: 0.3) {
+            self.resultsView.alpha = 0
+        }
+    }
+    
+    func classify(image: UIImage) {
+    }
+    
 }
 
 extension ViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-  func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-    picker.dismiss(animated: true)
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        picker.dismiss(animated: true)
+        
+        let image = info[.originalImage] as! UIImage
+        imageView.image = image
+        
+        classify(image: image)
+    }
+}
 
-	let image = info[.originalImage] as! UIImage
-    imageView.image = image
-
-    classify(image: image)
-  }
+extension ViewController {
+    func processObservations(for request: VNRequest, error: Error?) {
+        if let results = request.results as? [VNClassificationObservation] {
+            if results.isEmpty {
+                self.resultsLabel.text! = "Nothing Found! Plase try again..."
+            } else {
+                let result = results[0].identifier
+                let confidence = results[0].confidence
+                print(confidence)
+                if confidence < 0.7 {
+                    self.resultsLabel.text! = result
+                }
+                
+                    
+                    
+            }
+        } else if let error = error {
+            self.resultsLabel.text! = "An error occured: \(error.localizedDescription)"
+        } else {
+            self.resultsLabel.text! = "??? "
+        }
+    }
+    
+    
 }
