@@ -115,6 +115,13 @@ class ViewController: UIViewController {
     }
     
     func classify(image: UIImage) {
+        guard let newImage = image.cgImage else { return }
+        let handler = VNImageRequestHandler(cgImage: newImage)
+        do {
+            try handler.perform([self.classificationRequest])
+        } catch {
+            print("Failed to perform classification: \(error)")
+        }
     }
     
 }
@@ -139,11 +146,11 @@ extension ViewController {
                 let result = results[0].identifier
                 let confidence = results[0].confidence
                 print(confidence)
-                if confidence < 0.7 {
-                    self.resultsLabel.text! = result
+                if confidence < 0.90 {
+                    self.resultsLabel.text! = "Maybe " + result + "? Not quite sure😂"
+                } else {
+                    self.resultsLabel.text! = "I'm " + String(format: "%.1f%%", confidence * 100) + " sure that it is \(result) 🤗"
                 }
-                
-                    
                     
             }
         } else if let error = error {
@@ -151,7 +158,8 @@ extension ViewController {
         } else {
             self.resultsLabel.text! = "??? "
         }
+        
+        self.showResultsView()
     }
-    
     
 }
