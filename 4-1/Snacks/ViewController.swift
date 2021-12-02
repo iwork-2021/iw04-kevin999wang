@@ -145,7 +145,7 @@ extension ViewController {
             } else {
                 let result = results[0].identifier
                 let confidence = results[0].confidence
-                print(confidence)
+//                print(confidence)
                 if confidence < 0.90 {
                     self.resultsLabel.text! = "Maybe " + result + "? Not quite sure😂"
                 } else {
